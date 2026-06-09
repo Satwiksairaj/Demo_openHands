@@ -1,0 +1,57 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ai-dev-agent"
+version = "1.0.0"
+description = "Autonomous AI Developer Agent - Jira to GitHub PR automation"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [{name = "AI Dev Agent", email = "agent@autonomous.dev"}]
+
+dependencies = [
+    "openai>=1.50.0",
+    "openhands-ai>=0.30.0",
+    "mcp>=1.0.0",
+    "httpx>=0.27.0",
+    "aiohttp>=3.10.0",
+    "PyGithub>=2.3.0",
+    "gitpython>=3.1.43",
+    "click>=8.1.7",
+    "rich>=13.7.0",
+    "pydantic>=2.8.0",
+    "python-dotenv>=1.0.1",
+    "tenacity>=9.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3.0",
+    "pytest-asyncio>=0.24.0",
+    "pytest-mock>=3.14.0",
+    "ruff>=0.6.0",
+    "mypy>=1.11.0",
+]
+
+[project.scripts]
+agent = "cli.main:main"
+# Supports: python -m app.main --story AT-3
+# or:       python -m app --story AT-3
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["agent*", "cli*", "mcp*", "config*", "app*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
