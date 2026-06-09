@@ -1,0 +1,5 @@
+2026-06-09 15:38:39,569 - INFO - Received issue report: Test issue
+2026-06-09 15:39:17,850 - ERROR - Error editing employee 999: Employee not found
+2026-06-09 15:39:17,874 - INFO - Received issue report: Test issue
+2026-06-09 15:39:27,163 - ERROR - Error editing employee 999: Employee not found
+2026-06-09 15:39:27,179 - INFO - Received issue report: Test issue

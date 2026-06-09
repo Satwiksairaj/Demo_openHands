@@ -2,9 +2,12 @@ from flask import Flask, render_template, request, redirect, url_for, flash, jso
 from extensions import db
 from models import Employee, Department
 
+import logging
 app = Flask(__name__)
 
 app.config['SECRET_KEY'] = 'a_random_secure_key'
+# Set up logging
+logging.basicConfig(filename='app.log', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s', force=True)
 
 @app.route('/api/stats')
 def stats_api():
@@ -45,22 +48,57 @@ def add_employee():
 
 @app.route('/edit_employee/<int:employee_id>', methods=['GET', 'POST'])
 def edit_employee(employee_id):
-    employee = Employee.query.get_or_404(employee_id)
-    if request.method == 'POST':
-        employee.name = request.form['name']
-        employee.department_id = request.form['department_id']
-        db.session.commit()
-        flash('Employee updated successfully!')
+    employee = Employee.query.get(employee_id)
+    if not employee:
+        logging.error(f"Error editing employee {employee_id}: Employee not found")
+        flash('Employee not found.')
         return redirect(url_for('list_employees'))
+    if request.method == 'POST':
+        try:
+            employee.name = request.form['name']
+            employee.department_id = request.form['department_id']
+            db.session.commit()
+            flash('Employee updated successfully!')
+            return redirect(url_for('list_employees'))
+        except Exception as e:
+            logging.error(f"Error editing employee {employee_id}: {str(e)}")
+            flash('An error occurred while updating the employee.')
+            return redirect(url_for('list_employees'))
     departments = Department.query.all()
     return render_template('edit_employee.html', employee=employee, departments=departments)
 
+@app.before_request
+def ensure_log_file_exists():
+    import os
+    if not os.path.exists('app.log'):
+        with open('app.log', 'w'):
+            pass
+
+
 @app.route('/deactivate_employee/<int:employee_id>')
 def deactivate_employee(employee_id):
-    employee = Employee.query.get_or_404(employee_id)
-    employee.is_active = False
-    db.session.commit()
-    flash('Employee deactivated successfully!')
+    try:
+        employee = Employee.query.get(employee_id)
+        if not employee:
+            logging.error(f"Error deactivating employee {employee_id}: Employee not found")
+            flash('Employee not found.')
+            return redirect(url_for('list_employees'))
+        employee.is_active = False
+        db.session.commit()
+        flash('Employee deactivated successfully!')
+    except Exception as e:
+        logging.error(f"Error deactivating employee {employee_id}: {str(e)}")
+        flash('An error occurred while deactivating the employee.')
+    return redirect(url_for('list_employees'))
+@app.route('/report_issue', methods=['POST'])
+def report_issue():
+    try:
+        description = request.form['description']
+        logging.info(f'Received issue report: {description}')
+        flash('Thank you for reporting the issue. We will look into it.')
+    except Exception as e:
+        logging.error(f"Error reporting issue: {str(e)}")
+        flash('An error occurred while submitting your issue report.')
     return redirect(url_for('list_employees'))
 def initialize_database():
     with app.app_context():
