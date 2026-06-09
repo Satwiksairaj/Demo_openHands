@@ -29,6 +29,28 @@
                 </ul>
             </div>
         </div>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" data-bs-toggle="modal" data-bs-target="#issueModal">Report an issue</a>
+                    </li>
+                    <div class="modal fade" id="issueModal" tabindex="-1" aria-labelledby="issueModalLabel" aria-hidden="true">
+                        <div class="modal-dialog">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title" id="issueModalLabel">Report an Issue</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <form method="post" action="/report_issue">
+                                        <div class="mb-3">
+                                            <label for="issueDescription" class="form-label">Issue Description</label>
+                                            <textarea class="form-control" id="issueDescription" name="description" rows="3"></textarea>
+                                        </div>
+                                        <button type="submit" class="btn btn-primary">Submit</button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
     </nav>
     <div class="container mt-4">
         {% block content %}{% endblock %}

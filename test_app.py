@@ -59,3 +59,18 @@ def test_stats_api(client):
         # Ensure stats endpoint is returning correct data
         stats = {'total_employees': 12, 'active_employees': 12, 'inactive_employees': 0, 'department_counts': {'HR': 3, 'Engineering': 3, 'Sales': 3, 'Marketing': 3}}
         assert response.json == stats
+def test_log_error_handling(client, caplog):
+    with app.app_context():
+        # Trigger error by accessing non-existent employee
+        client.get(url_for('edit_employee', employee_id=999), follow_redirects=True)
+        # Check that log contains the error
+        assert any('Error editing employee' in message for message in caplog.text.split('\n'))
+
+def test_report_issue(client):
+    with app.app_context():
+        response = client.post(url_for('report_issue'), data={'description': 'Test issue'}, follow_redirects=True)
+        assert b'Thank you for reporting the issue' in response.data
+        # Verify logging took place
+        with open('app.log', 'r') as file:
+            log_content = file.read()
+        assert 'Received issue report: Test issue' in log_content
