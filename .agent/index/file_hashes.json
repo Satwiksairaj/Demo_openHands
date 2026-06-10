@@ -1,0 +1,10 @@
+{
+  "crud.py": "41d48d048762da347b327516bde41d78",
+  "database.py": "ce0d4d3715206ff0091095c38b927576",
+  "main.py": "be9bc89138b2d46367d8dc2f17c612e7",
+  "models.py": "9d6ddd7bb24fa4e8707a4bf86662fffb",
+  "schemas.py": "3c96f3139ee1fef6a049e1eb5bdc5a4a",
+  "test.db": "7a9e4848e7ba7c80fc6340af55735cda",
+  "tests\\test_bookmarks.py": "76ae3936f6ea00e262afc1b5618027e2",
+  "tests\\test_tags.py": "76ae3936f6ea00e262afc1b5618027e2"
+}
