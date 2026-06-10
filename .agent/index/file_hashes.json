@@ -1,0 +1,13 @@
+{
+  "app.py": "090eea0353f57f9f35ccc93d5f6b893d",
+  "database.py": "714edf4f325dc0a0d8d9b90cd83edff8",
+  "models.py": "c8c3d0021b26aaed5aa305fa947e7a7c",
+  "requirements.txt": "bd0563b7fcf6a9a6dedcd29436777331",
+  "instance\\expenses.db": "0556cd560a97c24a7b9bdf55146256ba",
+  "templates\\dashboard.html": "6ce8c58fb43f881893ac11de7d2cbcaf",
+  "templates\\index.html": "07b844a7fbf2428ae1ce0420b23ce3e7",
+  "tests\\test_auth.py": "edfef7f2267b5e55b4a8ef4036c49639",
+  "tests\\test_expenses.py": "643c107d85638074108cf0d71250ac77",
+  "templates\\auth\\login.html": "a11a6a302c5cd3445809edea160d4ea2",
+  "templates\\auth\\register.html": "3386abd7482f3f3cca74d6d645189e29"
+}
