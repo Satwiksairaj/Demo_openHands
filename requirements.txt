@@ -1,0 +1,14 @@
+Flask
+Flask-SQLAlchemy
+Flask-Login
+Flask-Bcrypt
+pytest
+Ensure that all necessary packages are included.
+
+```
+Flask
+Flask-SQLAlchemy
+Flask-Login
+Flask-Bcrypt
+pytest
+```
