@@ -2,6 +2,7 @@
 CLI Interface for the Autonomous AI Developer Agent.
 8-Step Workflow: Jira -> Repo Clone -> Analysis -> Code -> Tests -> Validate -> Git -> PR
 """
+
 # ── Force UTF-8 output on Windows before anything else ────────────────────────
 import os
 import sys
@@ -10,20 +11,20 @@ os.environ.setdefault("PYTHONIOENCODING", "utf-8")
 os.environ.setdefault("PYTHONUTF8", "1")
 
 # Reconfigure stdout/stderr to UTF-8 if needed (Python 3.7+)
-if hasattr(sys.stdout, "reconfigure"):
+stdout_reconfigure = getattr(sys.stdout, "reconfigure", None)
+stderr_reconfigure = getattr(sys.stderr, "reconfigure", None)
+if callable(stdout_reconfigure) and callable(stderr_reconfigure):
     try:
-        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+        stdout_reconfigure(encoding="utf-8", errors="replace")
+        stderr_reconfigure(encoding="utf-8", errors="replace")
     except Exception:
         pass
 
 import asyncio
 import json
 import logging
-import re
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 import click
 from dotenv import load_dotenv
@@ -46,6 +47,7 @@ load_dotenv()
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 
+
 def setup_logging(log_level: str = "INFO") -> None:
     logging.basicConfig(
         level=getattr(logging, log_level.upper(), logging.INFO),
@@ -63,11 +65,14 @@ def setup_logging(log_level: str = "INFO") -> None:
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
+
 def load_config() -> dict:
     """Load all configuration from environment variables / .env file."""
     return {
         "openai_api_key": os.getenv("OPENAI_API_KEY") or os.getenv("LLM_API_KEY", ""),
-        "workspace_base": os.getenv("WORKSPACE_BASE", "D:/autonomous-dev-agent/workspace"),
+        "workspace_base": os.getenv(
+            "WORKSPACE_BASE", "D:/autonomous-dev-agent/workspace"
+        ),
         "test_timeout": int(os.getenv("TEST_TIMEOUT", "300")),
         "jira": {
             "base_url": os.getenv("JIRA_BASE_URL", "").rstrip("/"),
@@ -90,7 +95,8 @@ def load_config() -> dict:
         ),
         "max_iterations": int(os.getenv("OPENHANDS_MAX_ITERATIONS", "15")),
         "max_identical_failures": int(os.getenv("MAX_IDENTICAL_FAILURES", "2")),
-        "confirmation_mode": os.getenv("OPENHANDS_CONFIRMATION_MODE", "false").lower() == "true",
+        "confirmation_mode": os.getenv("OPENHANDS_CONFIRMATION_MODE", "false").lower()
+        == "true",
     }
 
 
@@ -126,17 +132,17 @@ BANNER = """\
 +---------------------------------------------------------------+"""
 
 STEP_LABELS = {
-    "jira_fetch":       "Step 1/9  Jira Story Fetch",
-    "repo_clone":       "Step 2/9  Repository Clone",
-    "repo_analysis":    "Step 3/9  Codebase Analysis",
-    "solution_design":  "Step 4/9  Solution Architecture",
-    "code_generation":  "Step 5/9  Code Generation",
-    "testing":          "Step 6/9  Testing & Self-Healing",
-    "validation":       "Step 7/9  Acceptance Validation",
-    "git_ops":          "Step 8/9  Git Commit & Push",
-    "pr_creation":      "Step 9/9  Pull Request Creation",
-    "complete":         "DONE",
-    "failed":           "FAILED",
+    "jira_fetch": "Step 1/9  Jira Story Fetch",
+    "repo_clone": "Step 2/9  Repository Clone",
+    "repo_analysis": "Step 3/9  Codebase Analysis",
+    "solution_design": "Step 4/9  Solution Architecture",
+    "code_generation": "Step 5/9  Code Generation",
+    "testing": "Step 6/9  Testing & Self-Healing",
+    "validation": "Step 7/9  Acceptance Validation",
+    "git_ops": "Step 8/9  Git Commit & Push",
+    "pr_creation": "Step 9/9  Pull Request Creation",
+    "complete": "DONE",
+    "failed": "FAILED",
 }
 
 
@@ -154,22 +160,22 @@ def print_results(state) -> None:
     table.add_column("Field", style="cyan", no_wrap=True)
     table.add_column("Value", style="white")
 
-    table.add_row("Story ID",      story.get("story_id", "N/A"))
-    table.add_row("Title",         story.get("title", "N/A"))
-    table.add_row("Branch",        state.branch_name or "N/A")
-    table.add_row("Tests",         "[green]PASSED[/green]" if passed else "[red]FAILED[/red]")
+    table.add_row("Story ID", story.get("story_id", "N/A"))
+    table.add_row("Title", story.get("title", "N/A"))
+    table.add_row("Branch", state.branch_name or "N/A")
+    table.add_row("Tests", "[green]PASSED[/green]" if passed else "[red]FAILED[/red]")
     table.add_row("Files Changed", str(len(state.generated_files)))
-    table.add_row("PR URL",        state.pr_url or "N/A")
-    table.add_row("Retries",       str(state.iteration_count))
+    table.add_row("PR URL", state.pr_url or "N/A")
+    table.add_row("Retries", str(state.iteration_count))
 
     status_val = state.current_step.value
     color = "green" if status_val == "complete" else "red"
     table.add_row("Status", f"[{color}]{status_val.upper()}[/{color}]")
 
     if state.started_at and state.completed_at:
-        started   = datetime.fromisoformat(state.started_at)
+        started = datetime.fromisoformat(state.started_at)
         completed = datetime.fromisoformat(state.completed_at)
-        secs      = (completed - started).total_seconds()
+        secs = (completed - started).total_seconds()
         table.add_row("Duration", f"{secs:.1f}s")
 
     border = "green" if status_val == "complete" else "red"
@@ -178,9 +184,11 @@ def print_results(state) -> None:
 
 # ── CLI Commands ──────────────────────────────────────────────────────────────
 
+
 @click.group()
-@click.option("--log-level", default="INFO",
-              help="Logging level (DEBUG, INFO, WARNING, ERROR)")
+@click.option(
+    "--log-level", default="INFO", help="Logging level (DEBUG, INFO, WARNING, ERROR)"
+)
 @click.pass_context
 def cli(ctx, log_level):
     """Autonomous AI Developer Agent
@@ -194,14 +202,33 @@ def cli(ctx, log_level):
 
 
 @cli.command()
-@click.option("--story", "-s", default=None, metavar="STORY_ID",
-              help="Jira story ID  (e.g. IGN-245)")
-@click.option("--prompt", "-p", default=None, metavar="TEXT",
-              help='Natural-language task  (e.g. "Add JWT auth")')
-@click.option("--dry-run", is_flag=True, default=False,
-              help="Analyse only — do not write code or create PR")
-@click.option("--output", "-o", type=click.Path(), default=None,
-              help="Save JSON results to this file")
+@click.option(
+    "--story",
+    "-s",
+    default=None,
+    metavar="STORY_ID",
+    help="Jira story ID  (e.g. IGN-245)",
+)
+@click.option(
+    "--prompt",
+    "-p",
+    default=None,
+    metavar="TEXT",
+    help='Natural-language task  (e.g. "Add JWT auth")',
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    default=False,
+    help="Analyse only — do not write code or create PR",
+)
+@click.option(
+    "--output",
+    "-o",
+    type=click.Path(),
+    default=None,
+    help="Save JSON results to this file",
+)
 @click.pass_context
 def run(ctx, story, prompt, dry_run, output):
     """Run the autonomous 8-step development workflow.
@@ -227,7 +254,9 @@ def run(ctx, story, prompt, dry_run, output):
         for e in errors:
             console.print(f"  [red]x[/red] {e}")
         console.print()
-        console.print("[yellow]Add the missing values to your .env file and retry.[/yellow]")
+        console.print(
+            "[yellow]Add the missing values to your .env file and retry.[/yellow]"
+        )
         sys.exit(1)
 
     if story:
@@ -259,18 +288,19 @@ def run(ctx, story, prompt, dry_run, output):
             original_run = orch.run
 
             async def run_with_progress(**kwargs):
-                from agent.orchestrator import WorkflowStep
 
                 async def step_hook(step_enum):
                     label = STEP_LABELS.get(step_enum.value, step_enum.value)
                     progress.update(task_id, description=label)
 
                 # Intercept each step transition
-                orig_steps = orch.__class__._step_jira_fetch  # noqa: just checking
+                # orig_steps = orch.__class__._step_jira_fetch
 
                 state = await original_run(**kwargs)
-                progress.update(task_id,
-                    description=STEP_LABELS.get(state.current_step.value, "Done"))
+                progress.update(
+                    task_id,
+                    description=STEP_LABELS.get(state.current_step.value, "Done"),
+                )
                 return state
 
             return await run_with_progress(
@@ -298,16 +328,16 @@ def run(ctx, story, prompt, dry_run, output):
 
     if output:
         payload = {
-            "story_id":    state.story_id,
-            "story_data":  state.story_data,
-            "branch":      state.branch_name,
-            "pr_url":      state.pr_url,
-            "files":       state.generated_files,
-            "test_results":state.test_results,
-            "status":      state.current_step.value,
-            "errors":      state.errors,
-            "started_at":  state.started_at,
-            "completed_at":state.completed_at,
+            "story_id": state.story_id,
+            "story_data": state.story_data,
+            "branch": state.branch_name,
+            "pr_url": state.pr_url,
+            "files": state.generated_files,
+            "test_results": state.test_results,
+            "status": state.current_step.value,
+            "errors": state.errors,
+            "started_at": state.started_at,
+            "completed_at": state.completed_at,
         }
         Path(output).write_text(json.dumps(payload, indent=2), encoding="utf-8")
         console.print(f"\n[green]Results saved -> {output}[/green]")
@@ -322,19 +352,19 @@ def config():
     cfg = load_config()
 
     table = Table(box=box.SIMPLE_HEAVY, show_header=True, header_style="bold")
-    table.add_column("Variable",  style="cyan")
-    table.add_column("Status",    style="white")
-    table.add_column("Value",     style="dim")
+    table.add_column("Variable", style="cyan")
+    table.add_column("Status", style="white")
+    table.add_column("Value", style="dim")
 
     checks = [
-        ("OPENAI_API_KEY",     cfg.get("openai_api_key")),
-        ("JIRA_BASE_URL",      cfg["jira"].get("base_url")),
-        ("JIRA_EMAIL",         cfg["jira"].get("email")),
-        ("JIRA_API_TOKEN",     cfg["jira"].get("api_token")),
-        ("GITHUB_TOKEN",       cfg["github"].get("token")),
-        ("GITHUB_REPO_URL",    cfg["github"].get("repo_url")),
-        ("GITHUB_OWNER",       cfg["github"].get("owner")),
-        ("GITHUB_REPO",        cfg["github"].get("repo")),
+        ("OPENAI_API_KEY", cfg.get("openai_api_key")),
+        ("JIRA_BASE_URL", cfg["jira"].get("base_url")),
+        ("JIRA_EMAIL", cfg["jira"].get("email")),
+        ("JIRA_API_TOKEN", cfg["jira"].get("api_token")),
+        ("GITHUB_TOKEN", cfg["github"].get("token")),
+        ("GITHUB_REPO_URL", cfg["github"].get("repo_url")),
+        ("GITHUB_OWNER", cfg["github"].get("owner")),
+        ("GITHUB_REPO", cfg["github"].get("repo")),
         ("GITHUB_BASE_BRANCH", cfg["github"].get("base_branch")),
     ]
 
@@ -363,6 +393,7 @@ def fetch(story_id):
 
     async def _fetch():
         from agent.jira_agent import JiraAgent
+
         return await JiraAgent(cfg).fetch_story(story_id)
 
     with console.status(f"Fetching {story_id} ..."):
@@ -378,7 +409,46 @@ def version():
     console.print("Powered by OpenHands SDK + OpenAI GPT-4o")
 
 
+@cli.command()
+def context():
+    """Show active project context."""
+
+    from app.services.project_context_manager import ProjectContextManager
+
+    cfg = load_config()
+
+    mgr = ProjectContextManager(cfg["workspace_base"] + "/workspace")
+
+    ctx = mgr.get_active_project()
+
+    if not ctx:
+        console.print("[yellow]No active project context found[/yellow]")
+        return
+
+    console.print_json(data=ctx.__dict__)
+
+
+@cli.command(name="projects")
+def list_projects():
+    """List all projects in registry."""
+
+    from app.services.project_context_manager import ProjectContextManager
+
+    cfg = load_config()
+
+    mgr = ProjectContextManager(cfg["workspace_base"] + "/workspace")
+
+    projects = mgr.list_projects()
+
+    if not projects:
+        console.print("[yellow]No projects found[/yellow]")
+        return
+
+    console.print_json(data=projects)
+
+
 # ── Entry point ───────────────────────────────────────────────────────────────
+
 
 def main():
     """
@@ -391,7 +461,7 @@ def main():
     # Translate:  agent run -> story IGN-245
     #         to: agent run --story IGN-245
     if len(args) >= 3 and args[0] == "run" and args[1] == "->":
-        mode  = args[2].lower()          # "story" or "prompt"
+        mode = args[2].lower()  # "story" or "prompt"
         value = " ".join(args[3:]) if len(args) > 3 else ""
         if mode == "story":
             sys.argv = [sys.argv[0], "run", "--story", value]

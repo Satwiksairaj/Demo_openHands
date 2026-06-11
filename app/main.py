@@ -5,6 +5,7 @@ app/main.py — Entry point for:
 
 Delegates entirely to the existing CLI in cli/main.py.
 """
+
 import sys
 import os
 

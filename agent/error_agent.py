@@ -2,11 +2,11 @@
 Error Analysis Agent - Classifies failures, extracts root causes,
 detects infinite loops, and generates targeted healing strategies.
 """
+
 import hashlib
 import logging
 import re
 from dataclasses import dataclass, field
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +53,7 @@ FIX_STRATEGIES = {
 @dataclass
 class ErrorReport:
     """Structured result of error analysis."""
+
     type: str
     root_cause: str
     affected_files: list[str] = field(default_factory=list)
@@ -85,10 +86,14 @@ class ErrorAnalysisAgent:
         affected_files = self._extract_files(combined)
         affected_lines = self._extract_lines(combined)
         root_cause = self._extract_root_cause(combined, error_type)
-        fix_strategy = FIX_STRATEGIES.get(error_type, "Analyze the full output and fix the root cause.")
+        fix_strategy = FIX_STRATEGIES.get(
+            error_type, "Analyze the full output and fix the root cause."
+        )
 
         failure_hash = self._hash_failure(error_type, affected_files, root_cause)
-        self._failure_counts[failure_hash] = self._failure_counts.get(failure_hash, 0) + 1
+        self._failure_counts[failure_hash] = (
+            self._failure_counts.get(failure_hash, 0) + 1
+        )
         count = self._failure_counts[failure_hash]
         is_repeated = count > self.max_identical_failures
 
@@ -155,7 +160,9 @@ class ErrorAnalysisAgent:
             if "site-packages" not in path and "frozen" not in path:
                 files.append(path)
         # Also catch bare paths like C:\...\file.py or /path/to/file.py
-        for match in re.finditer(r'(?:^|\s)([A-Za-z]:\\[^\s:]+\.py|/[^\s:]+\.py)', output, re.MULTILINE):
+        for match in re.finditer(
+            r"(?:^|\s)([A-Za-z]:\\[^\s:]+\.py|/[^\s:]+\.py)", output, re.MULTILINE
+        ):
             path = match.group(1)
             if "site-packages" not in path:
                 files.append(path)
@@ -164,7 +171,7 @@ class ErrorAnalysisAgent:
     def _extract_lines(self, output: str) -> list[str]:
         """Extract specific error lines from output."""
         lines = []
-        for match in re.finditer(r'^\s*(?:E\s+.+|>{3}.+)$', output, re.MULTILINE):
+        for match in re.finditer(r"^\s*(?:E\s+.+|>{3}.+)$", output, re.MULTILINE):
             line = match.group(0).strip()
             if len(line) > 5:
                 lines.append(line)
@@ -173,13 +180,13 @@ class ErrorAnalysisAgent:
     def _extract_root_cause(self, output: str, error_type: str) -> str:
         """Extract the single most relevant error message line."""
         # Look for the last occurrence of the error type
-        pattern = rf'{error_type}:?\s*(.+)'
+        pattern = rf"{error_type}:?\s*(.+)"
         matches = re.findall(pattern, output, re.IGNORECASE)
         if matches:
             return matches[-1].strip()[:200]
 
         # Fallback: last non-empty line of the output
-        lines = [l.strip() for l in output.splitlines() if l.strip()]
+        lines = [line.strip() for line in output.splitlines() if line.strip()]
         if lines:
             return lines[-1][:200]
 

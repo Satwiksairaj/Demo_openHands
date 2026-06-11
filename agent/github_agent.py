@@ -2,12 +2,12 @@
 GitHub Agent - Handles all Git operations and Pull Request creation.
 Uses GitPython for local operations and PyGithub for API interactions.
 """
-import json
+
 import logging
-import os
 import subprocess
 from datetime import datetime, timezone
-from typing import Optional
+
+# from typing import Optional
 
 import httpx
 
@@ -31,15 +31,10 @@ class GitHubAgent:
         self.headers = {
             "Authorization": f"Bearer {self.token}",
             "Accept": "application/vnd.github+json",
-            "X-GitHub-Api-Version": "2022-11-28"
+            "X-GitHub-Api-Version": "2022-11-28",
         }
 
-    async def commit_and_push(
-        self,
-        workspace: str,
-        branch: str,
-        message: str
-    ) -> None:
+    async def commit_and_push(self, workspace: str, branch: str, message: str) -> None:
         """Stage all changes, commit, and push to remote."""
         logger.info("Staging all changes...")
         self._run(["git", "add", "--all"], workspace)
@@ -48,21 +43,14 @@ class GitHubAgent:
         status = self._run(["git", "status", "--porcelain"], workspace)
         if status.strip():
             logger.info(f"Committing: {message}")
-            self._run(
-                ["git", "commit", "-m", message],
-                workspace
-            )
+            self._run(["git", "commit", "-m", message], workspace)
         else:
             logger.info("No file changes — creating empty commit to establish branch")
-            self._run(
-                ["git", "commit", "--allow-empty", "-m", message],
-                workspace
-            )
+            self._run(["git", "commit", "--allow-empty", "-m", message], workspace)
 
         logger.info(f"Pushing branch: {branch}")
         self._run(
-            ["git", "push", "--set-upstream", "origin", branch, "--force"],
-            workspace
+            ["git", "push", "--set-upstream", "origin", branch, "--force"], workspace
         )
 
     async def create_pull_request(
@@ -71,7 +59,7 @@ class GitHubAgent:
         story: dict,
         test_results: dict,
         generated_files: list,
-        repo_analysis: dict
+        repo_analysis: dict,
     ) -> str:
         """Create a rich Pull Request via GitHub API."""
         story_id = story.get("story_id", "FEATURE")
@@ -91,19 +79,20 @@ class GitHubAgent:
                     "body": pr_body,
                     "head": branch,
                     "base": self.base_branch,
-                    "draft": False
-                }
+                    "draft": False,
+                },
             )
 
             # 422 = PR already exists or no commits between branches
             if resp.status_code == 422:
-                err = resp.json()
-                errors = err.get("errors", [])
+                # err = resp.json()
+                resp.json()
+                # errors = err.get("errors", [])
                 # Check if PR already open for this branch
                 existing = await client.get(
                     f"{self.api_base}/repos/{self.repo_owner}/{self.repo_name}/pulls",
                     headers=self.headers,
-                    params={"head": f"{self.repo_owner}:{branch}", "state": "open"}
+                    params={"head": f"{self.repo_owner}:{branch}", "state": "open"},
                 )
                 existing_prs = existing.json()
                 if existing_prs:
@@ -130,7 +119,7 @@ class GitHubAgent:
         story: dict,
         test_results: dict,
         generated_files: list,
-        repo_analysis: dict
+        repo_analysis: dict,
     ) -> str:
         """Build a detailed, structured PR description."""
         story_id = story.get("story_id", "")
@@ -147,13 +136,25 @@ class GitHubAgent:
             test_detail = f"- {test_results.get('failed_count', '?')} failures"
 
         # Files changed list
-        files_md = "\n".join(f"- `{f}`" for f in generated_files) if generated_files else "- No files tracked"
+        files_md = (
+            "\n".join(f"- `{f}`" for f in generated_files)
+            if generated_files
+            else "- No files tracked"
+        )
 
         # Requirements list
-        req_md = "\n".join(f"- [x] {r}" for r in requirements) if requirements else "- See story description"
+        req_md = (
+            "\n".join(f"- [x] {r}" for r in requirements)
+            if requirements
+            else "- See story description"
+        )
 
         # Acceptance criteria
-        ac_md = "\n".join(f"- [x] {c}" for c in acceptance_criteria) if acceptance_criteria else "- See story"
+        ac_md = (
+            "\n".join(f"- [x] {c}" for c in acceptance_criteria)
+            if acceptance_criteria
+            else "- See story"
+        )
 
         body = f"""## 🤖 Autonomous AI Developer Agent
 
@@ -242,7 +243,7 @@ class GitHubAgent:
                     await client.post(
                         f"{self.api_base}/repos/{self.repo_owner}/{self.repo_name}/labels",
                         headers=self.headers,
-                        json={"name": label, "color": "0075ca"}
+                        json={"name": label, "color": "0075ca"},
                     )
 
                 # Add labels to PR
@@ -250,16 +251,14 @@ class GitHubAgent:
                     f"{self.api_base}/repos/{self.repo_owner}/{self.repo_name}"
                     f"/issues/{pr_number}/labels",
                     headers=self.headers,
-                    json={"labels": labels}
+                    json={"labels": labels},
                 )
         except Exception as e:
             logger.debug(f"Could not add labels: {e}")
 
     def _run(self, cmd: list, cwd: str) -> str:
         """Run a git command."""
-        result = subprocess.run(
-            cmd, cwd=cwd, capture_output=True, text=True
-        )
+        result = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True)
         if result.returncode != 0:
             raise RuntimeError(
                 f"Git command failed: {' '.join(cmd)}\n"

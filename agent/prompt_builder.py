@@ -2,9 +2,8 @@
 Prompt Builder Agent - Converts structured requirements + repository analysis
 into precise, context-aware implementation prompts for the code generation agent.
 """
-import json
+
 import logging
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -38,8 +37,16 @@ class PromptBuilderAgent:
 
         req_text = "\n".join(f"- {r}" for r in requirements)
         ac_text = "\n".join(f"- {c}" for c in acceptance_criteria)
-        files_text = "\n".join(f"- {f}" for f in relevant_files) if relevant_files else "- To be determined"
-        patterns_text = "\n".join(f"- {p}" for p in existing_patterns) if existing_patterns else "- None detected"
+        files_text = (
+            "\n".join(f"- {f}" for f in relevant_files)
+            if relevant_files
+            else "- To be determined"
+        )
+        patterns_text = (
+            "\n".join(f"- {p}" for p in existing_patterns)
+            if existing_patterns
+            else "- None detected"
+        )
 
         return f"""You are a senior software architect. Produce a concise implementation plan.
 
@@ -100,9 +107,21 @@ Be specific. Every file path must be realistic for a {framework} / {language} pr
         coding_style = repo_analysis.get("coding_style", {})
         pkg_manager = repo_analysis.get("package_manager", "pip")
 
-        req_text = "\n".join(f"- {r}" for r in requirements) if requirements else "- See acceptance criteria"
-        ac_text = "\n".join(f"- {c}" for c in acceptance_criteria) if acceptance_criteria else ""
-        test_req_text = "\n".join(f"- {t}" for t in testing_requirements) if testing_requirements else ""
+        req_text = (
+            "\n".join(f"- {r}" for r in requirements)
+            if requirements
+            else "- See acceptance criteria"
+        )
+        ac_text = (
+            "\n".join(f"- {c}" for c in acceptance_criteria)
+            if acceptance_criteria
+            else ""
+        )
+        test_req_text = (
+            "\n".join(f"- {t}" for t in testing_requirements)
+            if testing_requirements
+            else ""
+        )
 
         files_to_modify = solution_design.get("files_to_modify", [])
         files_to_create = solution_design.get("files_to_create", [])
@@ -110,10 +129,18 @@ Be specific. Every file path must be realistic for a {framework} / {language} pr
         steps = solution_design.get("implementation_steps", [])
         deps = solution_design.get("dependencies_to_add", [])
 
-        modify_text = "\n".join(f"- {f}" for f in files_to_modify) if files_to_modify else ""
-        create_text = "\n".join(f"- {f}" for f in files_to_create) if files_to_create else ""
-        tests_text = "\n".join(f"- {f}" for f in tests_to_create) if tests_to_create else ""
-        steps_text = "\n".join(f"{i+1}. {s}" for i, s in enumerate(steps)) if steps else ""
+        modify_text = (
+            "\n".join(f"- {f}" for f in files_to_modify) if files_to_modify else ""
+        )
+        create_text = (
+            "\n".join(f"- {f}" for f in files_to_create) if files_to_create else ""
+        )
+        tests_text = (
+            "\n".join(f"- {f}" for f in tests_to_create) if tests_to_create else ""
+        )
+        steps_text = (
+            "\n".join(f"{i+1}. {s}" for i, s in enumerate(steps)) if steps else ""
+        )
         deps_text = " ".join(deps) if deps else ""
 
         install_cmd = {
@@ -260,7 +287,12 @@ FLASK FORMS / CSRF — MANDATORY:
 - Keep settings in settings.py, never import from views inside models.
 - Use `apps.py` for app config, not top-level imports."""
 
-        if "express" in fw or "node" in fw or "javascript" in lang or "typescript" in lang:
+        if (
+            "express" in fw
+            or "node" in fw
+            or "javascript" in lang
+            or "typescript" in lang
+        ):
             return """EXPRESS/NODE ARCHITECTURE — MANDATORY:
 - NEVER require files that create circular dependencies (A requires B, B requires A).
 - Put database connection in a separate db.js or database.js file.
@@ -291,7 +323,11 @@ FLASK FORMS / CSRF — MANDATORY:
         fix_strategy = error_classification.get("fix_strategy", "")
         affected_files = error_classification.get("affected_files", [])
 
-        files_text = "\n".join(f"- {f}" for f in affected_files) if affected_files else "- See test output"
+        files_text = (
+            "\n".join(f"- {f}" for f in affected_files)
+            if affected_files
+            else "- See test output"
+        )
 
         return f"""# Fix Attempt {attempt}/{max_attempts}
 

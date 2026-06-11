@@ -1,6 +1,12 @@
-"""
-CLI module - Command-line interface for the autonomous development agent.
-"""
-from cli.main import cli
+# """
+# CLI module - Command-line interface for the autonomous development agent.
+# """
+# from cli.main import cli
 
-__all__ = ["cli"]
+# __all__ = []
+# #
+"""
+CLI package.
+"""
+
+__all__ = []

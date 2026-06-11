@@ -1,10 +1,10 @@
 """
 Unit tests for the Autonomous AI Developer Agent components.
 """
+
 import json
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-
 
 # ─── Test fixtures ────────────────────────────────────────────────────────────
 
@@ -15,15 +15,15 @@ SAMPLE_CONFIG = {
     "jira": {
         "base_url": "https://test.atlassian.net",
         "email": "test@test.com",
-        "api_token": "test-token"
+        "api_token": "test-token",
     },
     "github": {
         "token": "test-github-token",
         "repo_url": "https://github.com/test/repo.git",
         "owner": "test",
         "repo": "repo",
-        "base_branch": "main"
-    }
+        "base_branch": "main",
+    },
 }
 
 SAMPLE_STORY = {
@@ -33,15 +33,18 @@ SAMPLE_STORY = {
     "requirements": [
         "Generate JWT token on login",
         "Add auth middleware",
-        "Protect API endpoints"
+        "Protect API endpoints",
     ],
     "acceptance_criteria": [
         "POST /auth/login returns JWT token",
-        "Protected routes return 401 without token"
+        "Protected routes return 401 without token",
     ],
     "technical_hints": ["Use jsonwebtoken library", "Add middleware to express router"],
     "files_to_modify": ["src/routes/auth.js", "src/middleware/auth.js"],
-    "testing_requirements": ["Unit test token generation", "Integration test protected routes"]
+    "testing_requirements": [
+        "Unit test token generation",
+        "Integration test protected routes",
+    ],
 }
 
 SAMPLE_REPO_ANALYSIS = {
@@ -57,20 +60,22 @@ SAMPLE_REPO_ANALYSIS = {
         "indentation": "2 spaces",
         "quotes": "single",
         "semicolons": "yes",
-        "naming_convention": "camelCase"
+        "naming_convention": "camelCase",
     },
     "existing_patterns": ["Express Router pattern", "Middleware chain"],
     "dependencies_to_add": ["jsonwebtoken@9.0.0"],
-    "implementation_notes": ["JWT secret should come from environment variable"]
+    "implementation_notes": ["JWT secret should come from environment variable"],
 }
 
 
 # ─── Jira Agent Tests ─────────────────────────────────────────────────────────
 
+
 class TestJiraAgent:
     @pytest.fixture
     def agent(self):
         from agent.jira_agent import JiraAgent
+
         return JiraAgent(SAMPLE_CONFIG)
 
     def test_extract_adf_text_simple(self, agent):
@@ -79,11 +84,9 @@ class TestJiraAgent:
             "content": [
                 {
                     "type": "paragraph",
-                    "content": [
-                        {"type": "text", "text": "Hello world"}
-                    ]
+                    "content": [{"type": "text", "text": "Hello world"}],
                 }
-            ]
+            ],
         }
         result = agent._extract_adf_text(adf)
         assert "Hello world" in result
@@ -111,7 +114,7 @@ class TestJiraAgent:
         fields = {
             "issuelinks": [
                 {"inwardIssue": {"key": "TEST-100"}},
-                {"outwardIssue": {"key": "TEST-101"}}
+                {"outwardIssue": {"key": "TEST-101"}},
             ]
         }
         links = agent._extract_linked_issues(fields)
@@ -120,7 +123,7 @@ class TestJiraAgent:
 
     @pytest.mark.asyncio
     async def test_parse_prompt(self, agent):
-        # JiraAgent uses AsyncOpenAI client directly 
+        # JiraAgent uses AsyncOpenAI client directly
         response_data = {
             "story_id": "PROMPT-001",
             "title": "Add JWT Auth",
@@ -129,14 +132,16 @@ class TestJiraAgent:
             "acceptance_criteria": ["Login works"],
             "technical_hints": [],
             "files_to_modify": [],
-            "testing_requirements": []
+            "testing_requirements": [],
         }
         mock_choice = MagicMock()
         mock_choice.message.content = json.dumps(response_data)
         mock_response = MagicMock()
         mock_response.choices = [mock_choice]
 
-        with patch.object(agent.client.chat.completions, 'create', new_callable=AsyncMock) as mock_create:
+        with patch.object(
+            agent.client.chat.completions, "create", new_callable=AsyncMock
+        ) as mock_create:
             mock_create.return_value = mock_response
 
             result = await agent.parse_prompt("Add JWT authentication")
@@ -148,28 +153,33 @@ class TestJiraAgent:
 
 # ─── Code Generation Agent Tests ─────────────────────────────────────────────
 
+
 class TestCodeGenerationAgent:
     @pytest.fixture
     def agent(self):
         from agent.code_agent import CodeGenerationAgent
+
         return CodeGenerationAgent(SAMPLE_CONFIG)
 
     @pytest.mark.asyncio
     async def test_generate_delegates_to_openhands(self, agent):
         # CodeGenerationAgent now delegates entirely to OpenHandsDevAgent
         from agent.openhands_agent import TaskResult
+
         mock_result = TaskResult(
             success=True,
             files_created=["src/auth.js", "tests/auth.test.js"],
             files_modified=[],
         )
-        with patch.object(agent.agent, 'generate_code', new_callable=AsyncMock) as mock_gen:
-            with patch.object(agent.agent, 'initialize', new_callable=AsyncMock):
+        with patch.object(
+            agent.agent, "generate_code", new_callable=AsyncMock
+        ) as mock_gen:
+            with patch.object(agent.agent, "initialize", new_callable=AsyncMock):
                 mock_gen.return_value = mock_result
                 files = await agent.generate(
                     story=SAMPLE_STORY,
                     repo_analysis=SAMPLE_REPO_ANALYSIS,
-                    workspace="/tmp/test"
+                    workspace="/tmp/test",
                 )
         assert "src/auth.js" in files
         assert "tests/auth.test.js" in files
@@ -178,10 +188,12 @@ class TestCodeGenerationAgent:
 
 # ─── Testing Agent Tests ──────────────────────────────────────────────────────
 
+
 class TestTestingAgent:
     @pytest.fixture
     def agent(self):
         from agent.testing_agent import TestingAgent
+
         return TestingAgent(SAMPLE_CONFIG)
 
     def test_detect_nodejs_project(self, agent, tmp_path):
@@ -229,10 +241,12 @@ class TestTestingAgent:
 
 # ─── Orchestrator Tests ───────────────────────────────────────────────────────
 
+
 class TestOrchestrator:
     @pytest.fixture
     def orchestrator(self):
-        from agent.orchestrator import OrchestratorAgent, WorkflowStep
+        from agent.orchestrator import OrchestratorAgent
+
         orch = OrchestratorAgent(SAMPLE_CONFIG)
         return orch
 
@@ -245,17 +259,37 @@ class TestOrchestrator:
         orchestrator.repo_agent.clone_and_branch = AsyncMock(return_value="/tmp/test")
         orchestrator.repo_agent.analyze = AsyncMock(return_value=SAMPLE_REPO_ANALYSIS)
         # Orchestrator uses openhands.generate_implementation (not code_agent.generate) when use_openhands=True
-        orchestrator.openhands.generate_implementation = AsyncMock(return_value=["src/auth.js"])
+        orchestrator.openhands.generate_implementation = AsyncMock(
+            return_value=["src/auth.js"]
+        )
         orchestrator.openhands.teardown = AsyncMock()
-        orchestrator.testing_agent.run_all = AsyncMock(return_value={"passed": True, "output": "All good", "test_count": 5, "failed_count": 0})
-        orchestrator.code_agent.validate_acceptance_criteria = AsyncMock(return_value={"passed": True})
+        orchestrator.testing_agent.run_all = AsyncMock(
+            return_value={
+                "passed": True,
+                "output": "All good",
+                "test_count": 5,
+                "failed_count": 0,
+            }
+        )
+        orchestrator.code_agent.validate_acceptance_criteria = AsyncMock(
+            return_value={"passed": True}
+        )
         orchestrator.github_agent.commit_and_push = AsyncMock()
-        orchestrator.github_agent.create_pull_request = AsyncMock(return_value="https://github.com/test/pr/1")
+        orchestrator.github_agent.create_pull_request = AsyncMock(
+            return_value="https://github.com/test/pr/1"
+        )
         # Bypass solution design LLM call
         orchestrator._step_solution_design = AsyncMock()
+
         # _step_testing runs subprocess directly; mock the whole step
         async def _testing_pass():
-            orchestrator.state.test_results = {"passed": True, "output": "All good", "test_count": 5, "failed_count": 0}
+            orchestrator.state.test_results = {
+                "passed": True,
+                "output": "All good",
+                "test_count": 5,
+                "failed_count": 0,
+            }
+
         orchestrator._step_testing = _testing_pass
 
         state = await orchestrator.run(story_id="TEST-123")
@@ -274,15 +308,27 @@ class TestOrchestrator:
         orchestrator.jira_agent.fetch_story = AsyncMock(return_value=SAMPLE_STORY)
         orchestrator.repo_agent.clone_and_branch = AsyncMock(return_value="/tmp/test")
         orchestrator.repo_agent.analyze = AsyncMock(return_value=SAMPLE_REPO_ANALYSIS)
-        orchestrator.openhands.generate_implementation = AsyncMock(return_value=["src/auth.js"])
+        orchestrator.openhands.generate_implementation = AsyncMock(
+            return_value=["src/auth.js"]
+        )
         orchestrator.openhands.teardown = AsyncMock()
-        orchestrator.code_agent.validate_acceptance_criteria = AsyncMock(return_value={"passed": True})
+        orchestrator.code_agent.validate_acceptance_criteria = AsyncMock(
+            return_value={"passed": True}
+        )
         orchestrator.github_agent.commit_and_push = AsyncMock()
-        orchestrator.github_agent.create_pull_request = AsyncMock(return_value="https://github.com/test/pr/2")
+        orchestrator.github_agent.create_pull_request = AsyncMock(
+            return_value="https://github.com/test/pr/2"
+        )
         orchestrator._step_solution_design = AsyncMock()
 
         async def _testing_pass():
-            orchestrator.state.test_results = {"passed": True, "output": "All passed", "test_count": 3, "failed_count": 0}
+            orchestrator.state.test_results = {
+                "passed": True,
+                "output": "All passed",
+                "test_count": 3,
+                "failed_count": 0,
+            }
+
         orchestrator._step_testing = _testing_pass
 
         state = await orchestrator.run(story_id="TEST-123")
@@ -297,13 +343,17 @@ class TestOrchestrator:
         orchestrator.jira_agent.fetch_story = AsyncMock(return_value=SAMPLE_STORY)
         orchestrator.repo_agent.clone_and_branch = AsyncMock(return_value="/tmp/test")
         orchestrator.repo_agent.analyze = AsyncMock(return_value=SAMPLE_REPO_ANALYSIS)
-        orchestrator.openhands.generate_implementation = AsyncMock(return_value=["src/auth.js"])
+        orchestrator.openhands.generate_implementation = AsyncMock(
+            return_value=["src/auth.js"]
+        )
         orchestrator.openhands.teardown = AsyncMock()
         orchestrator.code_agent.fix_from_test_output = AsyncMock(return_value=[])
         orchestrator._step_solution_design = AsyncMock()
+
         # Simulate max retries exhausted in _step_testing
         async def _testing_always_fails():
             raise RuntimeError("Tests failed after 3 attempts. Always fails")
+
         orchestrator._step_testing = _testing_always_fails
 
         state = await orchestrator.run(story_id="TEST-123")

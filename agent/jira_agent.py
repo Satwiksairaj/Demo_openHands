@@ -2,10 +2,12 @@
 Jira Agent - Fetches and structures requirements from Jira stories.
 Uses MCP Jira server when available, falls back to REST API.
 """
+
 import json
 import logging
 import re
-from typing import Optional
+
+# from typing import Optional
 
 import httpx
 from openai import AsyncOpenAI
@@ -69,7 +71,7 @@ class JiraAgent:
         self.base_url = self.jira_config.get("base_url", "").rstrip("/")
         self.auth = (
             self.jira_config.get("email", ""),
-            self.jira_config.get("api_token", "")
+            self.jira_config.get("api_token", ""),
         )
 
     async def fetch_story(self, story_id: str) -> dict:
@@ -96,8 +98,7 @@ class JiraAgent:
 
         # Extract acceptance criteria (often in custom field or description)
         acceptance_criteria = self._extract_acceptance_criteria(
-            fields.get("customfield_10016", {}),
-            description
+            fields.get("customfield_10016", {}), description
         )
 
         # Fetch comments
@@ -177,7 +178,7 @@ class JiraAgent:
             title=raw["title"],
             description=raw["description"],
             acceptance_criteria=raw["acceptance_criteria"],
-            comments="\n".join(raw.get("comments", []))
+            comments="\n".join(raw.get("comments", [])),
         )
         response = await self.client.chat.completions.create(
             model="gpt-4o",
@@ -185,7 +186,8 @@ class JiraAgent:
             temperature=0,
         )
 
-        content = response.choices[0].message.content.strip()
+        raw_content = response.choices[0].message.content
+        content = (raw_content or "").strip()
         # Strip markdown code blocks if present
         content = re.sub(r"```(?:json)?\n?", "", content).strip().rstrip("`")
         return json.loads(content)
@@ -193,13 +195,17 @@ class JiraAgent:
     async def parse_prompt(self, prompt: str) -> dict:
         """Parse a natural language prompt into structured requirements."""
         from datetime import datetime, timezone
+
         story_id = f"PROMPT-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
-        user_message = PROMPT_TO_REQUIREMENTS_PROMPT.format(prompt=prompt, story_id=story_id)
+        user_message = PROMPT_TO_REQUIREMENTS_PROMPT.format(
+            prompt=prompt, story_id=story_id
+        )
         response = await self.client.chat.completions.create(
             model="gpt-4o",
             messages=[{"role": "user", "content": user_message}],
             temperature=0,
         )
-        content = response.choices[0].message.content.strip()
+        raw_content = response.choices[0].message.content
+        content = (raw_content or "").strip()
         content = re.sub(r"```(?:json)?\n?", "", content).strip().rstrip("`")
         return json.loads(content)

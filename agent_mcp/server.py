@@ -9,7 +9,7 @@ import logging
 import os
 
 import httpx
-from mcp.server import Server  # type: ignore[attr-defined]
+from mcp.server import Server
 from mcp.server.models import InitializationOptions
 from mcp.server.stdio import stdio_server
 from mcp.types import (

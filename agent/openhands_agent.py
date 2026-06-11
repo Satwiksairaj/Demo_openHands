@@ -2,14 +2,14 @@
 OpenHands Agent Wrapper - Uses OpenHands SDK v1.x (LocalConversation) for
 autonomous code generation, fixing, and validation.
 """
-import asyncio
+
 import json
 import logging
 import os
 from dataclasses import dataclass, field
 from typing import Optional
 
-from agent.openhands_runtime import OpenHandsConfig, OpenHandsRuntime, ExecutionResult
+from agent.openhands_runtime import OpenHandsConfig, OpenHandsRuntime
 
 logger = logging.getLogger(__name__)
 
@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class TaskContext:
     """Context information for a development task."""
+
     requirements: list[str] = field(default_factory=list)
     acceptance_criteria: list[str] = field(default_factory=list)
     repo_analysis: dict = field(default_factory=dict)
@@ -28,6 +29,7 @@ class TaskContext:
 @dataclass
 class TaskResult:
     """Result of an OpenHands development task."""
+
     success: bool
     files_created: list[str] = field(default_factory=list)
     files_modified: list[str] = field(default_factory=list)
@@ -73,7 +75,9 @@ class OpenHandsDevAgent:
         await self.runtime.shutdown()
         self._workspace_path = None
 
-    async def generate_code(self, task_description: str, context: TaskContext) -> TaskResult:
+    async def generate_code(
+        self, task_description: str, context: TaskContext
+    ) -> TaskResult:
         prompt = self._build_generation_prompt(task_description, context)
         logger.info(f"Generating code: {task_description[:80]}...")
         result = await self.runtime.run_task(prompt, workspace=self._workspace_path)
@@ -84,7 +88,9 @@ class OpenHandsDevAgent:
             errors=[result.error] if result.error else [],
         )
 
-    async def fix_code(self, test_output: str, error_message: str, context: TaskContext) -> TaskResult:
+    async def fix_code(
+        self, test_output: str, error_message: str, context: TaskContext
+    ) -> TaskResult:
         prompt = (
             "Tests are failing. Fix the code so ALL tests pass.\n\n"
             f"## Test Output\n```\n{test_output[:4000]}\n```\n\n"
@@ -142,8 +148,10 @@ Return ONLY a JSON object:
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0,
             )
-            content = response.choices[0].message.content.strip()
+            raw_content = response.choices[0].message.content
+            content = (raw_content or "").strip()
             import re
+
             content = re.sub(r"```(?:json)?\n?", "", content).strip().rstrip("`")
             return json.loads(content)
         except Exception as e:
@@ -217,6 +225,7 @@ class OpenHandsWorkflowIntegration:
         self, story_data: dict, repo_analysis: dict, workspace: str
     ) -> list[str]:
         import subprocess as _sp
+
         if not self._initialized:
             await self.setup(workspace)
 
@@ -232,16 +241,31 @@ class OpenHandsWorkflowIntegration:
         requirements = story_data.get("requirements", [])
         acceptance_criteria = story_data.get("acceptance_criteria", [])
         testing_requirements = story_data.get("testing_requirements", [])
-        req_text = "\n".join(f"- {r}" for r in requirements) if requirements else "- See acceptance criteria"
-        ac_text  = "\n".join(f"- {c}" for c in acceptance_criteria) if acceptance_criteria else ""
-        tst_text = "\n".join(f"- {t}" for t in testing_requirements) if testing_requirements else ""
+        req_text = (
+            "\n".join(f"- {r}" for r in requirements)
+            if requirements
+            else "- See acceptance criteria"
+        )
+        ac_text = (
+            "\n".join(f"- {c}" for c in acceptance_criteria)
+            if acceptance_criteria
+            else ""
+        )
+        tst_text = (
+            "\n".join(f"- {t}" for t in testing_requirements)
+            if testing_requirements
+            else ""
+        )
 
         # Detect whether this is a brand-new project or a modification of existing code.
         # A workspace with ≤2 tracked files is treated as "new project".
         try:
             _r = _sp.run(
-                ["git", "ls-files"], cwd=workspace,
-                capture_output=True, text=True, timeout=10
+                ["git", "ls-files"],
+                cwd=workspace,
+                capture_output=True,
+                text=True,
+                timeout=10,
             )
             tracked = [f for f in _r.stdout.strip().splitlines() if f]
         except Exception:
@@ -280,7 +304,7 @@ class OpenHandsWorkflowIntegration:
                 "- NEVER use CSRFProtect or flask_wtf. It causes HTTP 400 on every POST form submission.\n"
                 "- NEVER add `from flask_wtf.csrf import CSRFProtect` or `csrf = CSRFProtect(app)` anywhere.\n"
                 "- NEVER add {{ csrf_token() }} to templates.\n"
-                "- Use plain HTML forms: <form method=\"post\"> with no CSRF tokens.\n"
+                '- Use plain HTML forms: <form method="post"> with no CSRF tokens.\n'
                 "- app.py imports: `from flask import Flask, render_template, request, redirect, url_for, flash, jsonify`\n"
                 "- Do NOT import flask_wtf anywhere.\n\n"
                 "For FastAPI: put engine/Base in database.py, import from there in models.py\n"
@@ -357,8 +381,12 @@ class OpenHandsWorkflowIntegration:
         return result.files_modified
 
     async def run_tests_with_retry(
-        self, workspace: str, project_type: str, repo_analysis: dict,
-        max_retries: int = 3, generated_files: list = None
+        self,
+        workspace: str,
+        project_type: str,
+        repo_analysis: dict,
+        max_retries: int = 3,
+        generated_files: Optional[list[str]] = None,
     ) -> dict:
         if not self._initialized:
             await self.setup(workspace)
@@ -377,12 +405,15 @@ class OpenHandsWorkflowIntegration:
         test_cmd = base_cmd
         if project_type in ("python", None):
             explicit_tests = [
-                f for f in (generated_files or [])
-                if f.endswith(".py") and ("test" in f.lower() or f.lower().startswith("test"))
+                f
+                for f in (generated_files or [])
+                if f.endswith(".py")
+                and ("test" in f.lower() or f.lower().startswith("test"))
             ]
             if not explicit_tests:
                 # Auto-discover any test_*.py in the workspace root
                 import glob as _glob
+
                 explicit_tests = [
                     os.path.basename(p)
                     for p in _glob.glob(os.path.join(workspace, "test_*.py"))
@@ -391,7 +422,9 @@ class OpenHandsWorkflowIntegration:
                 test_cmd = f"pytest -v --tb=short -x {' '.join(explicit_tests)}"
 
         for attempt in range(1, max_retries + 1):
-            result = await self._agent.runtime.run_command(test_cmd, working_dir=workspace)
+            result = await self._agent.runtime.run_command(
+                test_cmd, working_dir=workspace
+            )
             if result.success:
                 return {"passed": True, "output": result.output, "attempts": attempt}
 

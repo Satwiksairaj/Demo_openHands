@@ -2,6 +2,7 @@
 Repository Agent - Clones repositories and analyzes their structure,
 frameworks, conventions, and relevant files.
 """
+
 import json
 import logging
 import os
@@ -57,7 +58,9 @@ class RepositoryAgent:
         self.config = config
         self.github_config = config.get("github", {})
         self.client = AsyncOpenAI(api_key=config.get("openai_api_key"))
-        self.workspace_base = config.get("workspace_base", str(Path.home() / "agent-workspaces"))
+        self.workspace_base = config.get(
+            "workspace_base", str(Path.home() / "agent-workspaces")
+        )
         os.makedirs(self.workspace_base, exist_ok=True)
 
     async def clone_and_branch(self, repo_url: str, branch_name: str) -> str:
@@ -66,8 +69,7 @@ class RepositoryAgent:
         token = self.github_config.get("token", "")
         if token and "github.com" in repo_url:
             repo_url = repo_url.replace(
-                "https://github.com",
-                f"https://{token}@github.com"
+                "https://github.com", f"https://{token}@github.com"
             )
 
         repo_name = repo_url.rstrip("/").split("/")[-1].replace(".git", "")
@@ -89,7 +91,7 @@ class RepositoryAgent:
 
         Path(self.workspace_base).mkdir(parents=True, exist_ok=True)
 
-        logger.info(f"Cloning repository...")
+        logger.info("Cloning repository...")
         self._run(["git", "clone", repo_url, workspace_str])
 
         logger.info(f"Creating branch: {branch_name}")
@@ -98,18 +100,15 @@ class RepositoryAgent:
         # Configure git identity for commits
         self._run(
             ["git", "config", "user.email", "ai-agent@autonomous.dev"],
-            cwd=workspace_str
+            cwd=workspace_str,
         )
-        self._run(
-            ["git", "config", "user.name", "AI Dev Agent"],
-            cwd=workspace_str
-        )
+        self._run(["git", "config", "user.name", "AI Dev Agent"], cwd=workspace_str)
 
         return workspace_str
 
     async def analyze(self, workspace: str, story_data: dict) -> dict:
         """Perform deep analysis of the repository structure."""
-        tree = self._get_tree(workspace, max_depth=2)       # shallow — big repos
+        tree = self._get_tree(workspace, max_depth=2)  # shallow — big repos
         key_files = self._read_key_files(workspace)
 
         # Keep total prompt size manageable
@@ -128,13 +127,16 @@ class RepositoryAgent:
             temperature=0,
         )
 
-        content = response.choices[0].message.content.strip()
+        raw_content = response.choices[0].message.content
+        content = (raw_content or "").strip()
         content = re.sub(r"```(?:json)?\n?", "", content).strip().rstrip("`")
 
         try:
             analysis = json.loads(content)
         except (json.JSONDecodeError, ValueError):
-            logger.warning("Repo analysis: LLM returned non-JSON, using static fallback")
+            logger.warning(
+                "Repo analysis: LLM returned non-JSON, using static fallback"
+            )
             analysis = self._static_analysis(workspace)
 
         # Augment with static analysis
@@ -189,8 +191,16 @@ class RepositoryAgent:
     def _get_tree(self, workspace: str, max_depth: int = 4) -> str:
         """Get directory tree, excluding noise directories."""
         exclude = {
-            "node_modules", ".git", "__pycache__", ".pytest_cache",
-            "dist", "build", ".next", "venv", ".venv", "coverage"
+            "node_modules",
+            ".git",
+            "__pycache__",
+            ".pytest_cache",
+            "dist",
+            "build",
+            ".next",
+            "venv",
+            ".venv",
+            "coverage",
         }
         lines = []
         workspace_path = Path(workspace)
@@ -218,12 +228,24 @@ class RepositoryAgent:
     def _read_key_files(self, workspace: str) -> str:
         """Read the most important files for understanding the project."""
         priority_files = [
-            "package.json", "pyproject.toml", "requirements.txt",
-            "setup.py", "Cargo.toml", "go.mod", "pom.xml",
-            "README.md", "README.rst",
-            "src/app.js", "src/index.js", "app.js", "index.js",
-            "src/main.py", "main.py", "app.py",
-            "src/app.ts", "src/index.ts",
+            "package.json",
+            "pyproject.toml",
+            "requirements.txt",
+            "setup.py",
+            "Cargo.toml",
+            "go.mod",
+            "pom.xml",
+            "README.md",
+            "README.rst",
+            "src/app.js",
+            "src/index.js",
+            "app.js",
+            "index.js",
+            "src/main.py",
+            "main.py",
+            "app.py",
+            "src/app.ts",
+            "src/index.ts",
         ]
 
         contents = []
@@ -246,7 +268,9 @@ class RepositoryAgent:
                         if fname.endswith((".js", ".ts", ".py", ".go", ".java", ".rs")):
                             fpath = os.path.join(root, fname)
                             try:
-                                with open(fpath, "r", encoding="utf-8", errors="ignore") as f:
+                                with open(
+                                    fpath, "r", encoding="utf-8", errors="ignore"
+                                ) as f:
                                     content = f.read(2000)
                                 rel = os.path.relpath(fpath, workspace)
                                 contents.append(f"=== {rel} ===\n{content}\n")
@@ -261,11 +285,19 @@ class RepositoryAgent:
         configs = []
         for name in os.listdir(workspace):
             if name in {
-                ".eslintrc", ".eslintrc.js", ".eslintrc.json",
-                ".prettierrc", "tsconfig.json", ".babelrc",
-                "jest.config.js", "jest.config.ts",
-                "pytest.ini", "setup.cfg", "mypy.ini",
-                "Makefile", "docker-compose.yml"
+                ".eslintrc",
+                ".eslintrc.js",
+                ".eslintrc.json",
+                ".prettierrc",
+                "tsconfig.json",
+                ".babelrc",
+                "jest.config.js",
+                "jest.config.ts",
+                "pytest.ini",
+                "setup.cfg",
+                "mypy.ini",
+                "Makefile",
+                "docker-compose.yml",
             }:
                 configs.append(name)
         return configs
@@ -276,15 +308,26 @@ class RepositoryAgent:
             ".github/workflows",
             ".gitlab-ci.yml",
             "Jenkinsfile",
-            ".circleci/config.yml"
+            ".circleci/config.yml",
         ]
         return any(os.path.exists(os.path.join(workspace, p)) for p in ci_paths)
-
-    def _run(self, cmd: list, cwd: str = None, check: bool = True) -> str:
-        """Run a shell command and return output."""
+    
+    def _run_git(self, cmd: list[str], cwd: Optional[str] = None):
+        """Run a git command and return output."""
         result = subprocess.run(
-            cmd, cwd=cwd, capture_output=True, text=True, check=check
+            ["git"] + cmd, cwd=cwd, capture_output=True, text=True
         )
+        if result.returncode != 0:
+            raise RuntimeError(
+                f"Git command failed: {' '.join(cmd)}\n"
+                f"STDOUT: {result.stdout}\n"
+                f"STDERR: {result.stderr}"
+            )
+        return result.stdout
+
+    def _run(self, cmd: list[str], cwd: Optional[str] = None, check: bool = True) -> str:
+        """Run a shell command and return output."""
+        result = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, check=False)
         if result.returncode != 0 and check:
             raise RuntimeError(
                 f"Command failed: {' '.join(cmd)}\n"

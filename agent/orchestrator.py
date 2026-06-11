@@ -2,7 +2,7 @@
 Orchestrator Agent - Controls the complete autonomous development workflow.
 Supports both traditional LLM-based code generation and OpenHands SDK integration.
 """
-import asyncio
+
 import json
 import logging
 import os
@@ -18,7 +18,7 @@ from agent.testing_agent import TestingAgent
 from agent.github_agent import GitHubAgent
 from agent.openhands_agent import OpenHandsWorkflowIntegration
 from agent.prompt_builder import PromptBuilderAgent
-from agent.error_agent import ErrorAnalysisAgent, ErrorReport
+from agent.error_agent import ErrorAnalysisAgent
 
 OPENHANDS_AVAILABLE = True
 
@@ -59,7 +59,9 @@ class WorkflowState:
     errors: list = field(default_factory=list)
     iteration_count: int = 0
     max_iterations: int = 3
-    started_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    started_at: str = field(
+        default_factory=lambda: datetime.now(timezone.utc).isoformat()
+    )
     completed_at: Optional[str] = None
 
 
@@ -88,12 +90,13 @@ class OrchestratorAgent:
             max_identical_failures=config.get("max_identical_failures", 2)
         )
 
-    async def run(self, story_id: str = None, prompt: str = None) -> WorkflowState:
+    async def run(self,  story_id: Optional[str] = None,
+    prompt: Optional[str] = None) -> WorkflowState:
         """Execute the complete autonomous development workflow."""
         self.state.story_id = story_id
         self.state.natural_prompt = prompt
 
-        logger.info(f"🚀 Starting autonomous development workflow")
+        logger.info("🚀 Starting autonomous development workflow")
         logger.info(f"   Story ID: {story_id or 'N/A'}")
         logger.info(f"   Prompt: {prompt or 'N/A'}")
 
@@ -137,16 +140,23 @@ class OrchestratorAgent:
         """Step 1: Fetch and parse Jira story."""
         if self.state.story_id:
             logger.info(f"Fetching Jira story: {self.state.story_id}")
-            self.state.story_data = await self.jira_agent.fetch_story(self.state.story_id)
+            self.state.story_data = await self.jira_agent.fetch_story(
+                self.state.story_id
+            )
         else:
             logger.info("Parsing natural language prompt into requirements")
-            self.state.story_data = await self.jira_agent.parse_prompt(self.state.natural_prompt)
+            self.state.story_data = await self.jira_agent.parse_prompt(
+                self.state.natural_prompt
+            )
 
-        logger.info(f"✅ Requirements parsed: {json.dumps(self.state.story_data, indent=2)}")
+        logger.info(
+            f"✅ Requirements parsed: {json.dumps(self.state.story_data, indent=2)}"
+        )
 
     async def _step_repo_clone(self):
         """Step 2: Clone repository and create feature branch."""
         from datetime import datetime as _dt, timezone as _tz
+
         repo_url = self.config["github"]["repo_url"]
         story_id = self.state.story_data.get("story_id", "feature")
         # Add a timestamp suffix so every run gets a unique branch name
@@ -165,16 +175,17 @@ class OrchestratorAgent:
         """Step 3: Analyze repository structure and patterns."""
         logger.info(f"Analyzing repository at: {self.state.workspace_path}")
         self.state.repo_analysis = await self.repo_agent.analyze(
-            self.state.workspace_path,
-            self.state.story_data
+            self.state.workspace_path, self.state.story_data
         )
         logger.info(f"✅ Analysis:\n{json.dumps(self.state.repo_analysis, indent=2)}")
 
     async def _step_solution_design(self):
         """Step 4: Generate architecture / implementation plan before writing code."""
         import re
+
         logger.info("Designing solution architecture...")
         from openai import AsyncOpenAI
+
         client = AsyncOpenAI(
             api_key=self.config.get("openai_api_key", os.getenv("OPENAI_API_KEY", ""))
         )
@@ -200,7 +211,9 @@ class OrchestratorAgent:
                 "implementation_steps": [],
                 "dependencies_to_add": [],
             }
-        logger.info(f"✅ Solution design:\n{json.dumps(self.state.solution_design, indent=2)}")
+        logger.info(
+            f"✅ Solution design:\n{json.dumps(self.state.solution_design, indent=2)}"
+        )
 
     async def _step_code_generation(self):
         """Step 4: Generate implementation code."""
@@ -210,32 +223,38 @@ class OrchestratorAgent:
             self.state.generated_files = await self.openhands.generate_implementation(
                 story_data=self.state.story_data,
                 repo_analysis=self.state.repo_analysis,
-                workspace=self.state.workspace_path
+                workspace=self.state.workspace_path,
             )
         else:
             self.state.generated_files = await self.code_agent.generate(
                 story=self.state.story_data,
                 repo_analysis=self.state.repo_analysis,
-                workspace=self.state.workspace_path
+                workspace=self.state.workspace_path,
             )
 
         # Always detect changed files via git diff (most reliable)
         if not self.state.generated_files and self.state.workspace_path:
             import subprocess
+
             try:
                 r1 = subprocess.run(
                     ["git", "diff", "--name-only", "HEAD"],
                     cwd=self.state.workspace_path,
-                    capture_output=True, text=True, timeout=15
+                    capture_output=True,
+                    text=True,
+                    timeout=15,
                 )
                 r2 = subprocess.run(
                     ["git", "ls-files", "--others", "--exclude-standard"],
                     cwd=self.state.workspace_path,
-                    capture_output=True, text=True, timeout=15
+                    capture_output=True,
+                    text=True,
+                    timeout=15,
                 )
                 self.state.generated_files = [
-                    f for f in
-                    r1.stdout.strip().splitlines() + r2.stdout.strip().splitlines()
+                    f
+                    for f in r1.stdout.strip().splitlines()
+                    + r2.stdout.strip().splitlines()
                     if f
                 ]
             except Exception:
@@ -270,7 +289,9 @@ class OrchestratorAgent:
             "java-maven": "mvn test",
             "java-gradle": "gradle test",
         }
-        import glob as _glob, subprocess as _sp
+        import glob as _glob
+        import subprocess as _sp
+
         base_cmd = test_commands.get(project_type, "pytest test_*.py -v --tb=short")
 
         for attempt in range(1, self.state.max_iterations + 1):
@@ -280,7 +301,8 @@ class OrchestratorAgent:
             test_cmd = base_cmd
             if project_type == "python":
                 explicit = [
-                    f for f in (self.state.generated_files or [])
+                    f
+                    for f in (self.state.generated_files or [])
                     if f.endswith(".py") and "test" in f.lower()
                 ]
                 if not explicit:
@@ -294,8 +316,12 @@ class OrchestratorAgent:
                     test_cmd = f"pytest {' '.join(explicit)} -v --tb=short -x"
 
             proc = _sp.run(
-                test_cmd, shell=True, cwd=self.state.workspace_path,
-                capture_output=True, text=True, timeout=300
+                test_cmd,
+                shell=True,
+                cwd=self.state.workspace_path,
+                capture_output=True,
+                text=True,
+                timeout=300,
             )
             output = (proc.stdout or "") + (proc.stderr or "")
             passed = proc.returncode == 0
@@ -314,13 +340,15 @@ class OrchestratorAgent:
 
             # Analyse the failure
             error_report = self.error_agent.analyze(output)
-            self.state.healing_attempts.append({
-                "attempt": attempt,
-                "error_type": error_report.type,
-                "root_cause": error_report.root_cause,
-                "affected_files": error_report.affected_files,
-                "is_repeated": error_report.is_repeated,
-            })
+            self.state.healing_attempts.append(
+                {
+                    "attempt": attempt,
+                    "error_type": error_report.type,
+                    "root_cause": error_report.root_cause,
+                    "affected_files": error_report.affected_files,
+                    "is_repeated": error_report.is_repeated,
+                }
+            )
             logger.warning(
                 f"\n❌ Tests failed (attempt {attempt}):\n"
                 + self.error_agent.format_report(error_report)
@@ -339,7 +367,9 @@ class OrchestratorAgent:
                 )
 
             if attempt < self.state.max_iterations:
-                logger.info(f"🔧 Applying autonomous fix (error_type={error_report.type})...")
+                logger.info(
+                    f"🔧 Applying autonomous fix (error_type={error_report.type})..."
+                )
                 fix_prompt = self.prompt_builder.build_fix_prompt(
                     test_output=output,
                     error_classification={
@@ -353,6 +383,7 @@ class OrchestratorAgent:
                     workspace=self.state.workspace_path,
                 )
                 from agent.openhands_agent import TaskContext
+
                 await self.openhands._agent.fix_code(
                     test_output=fix_prompt,
                     error_message=error_report.root_cause,
@@ -392,6 +423,7 @@ class OrchestratorAgent:
     def _run_security_check(self) -> list[str]:
         """Basic static security scan on generated Python files."""
         import subprocess as _sp
+
         issues: list[str] = []
         if not self.state.workspace_path:
             return issues
@@ -400,7 +432,9 @@ class OrchestratorAgent:
             result = _sp.run(
                 ["bandit", "-r", ".", "-ll", "-q", "--format", "txt"],
                 cwd=self.state.workspace_path,
-                capture_output=True, text=True, timeout=60
+                capture_output=True,
+                text=True,
+                timeout=60,
             )
             if result.returncode not in (0, 1):  # 1 = issues found
                 return issues
@@ -421,7 +455,7 @@ class OrchestratorAgent:
         await self.github_agent.commit_and_push(
             workspace=self.state.workspace_path,
             branch=self.state.branch_name,
-            message=commit_msg
+            message=commit_msg,
         )
         logger.info("✅ Changes committed and pushed")
 
