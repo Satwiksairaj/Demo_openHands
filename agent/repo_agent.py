@@ -7,7 +7,10 @@ import json
 import logging
 import os
 import re
+import shutil
 import subprocess
+import stat
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -75,19 +78,35 @@ class RepositoryAgent:
         repo_name = repo_url.rstrip("/").split("/")[-1].replace(".git", "")
         # Use forward slashes — git clone requires POSIX-style paths on Windows too
         workspace = Path(self.workspace_base) / repo_name
-        workspace_str = workspace.as_posix()
 
-        # Remove existing workspace (cross-platform, handles read-only .git files)
+        if (workspace / ".git").exists():
+            logger.info("Reusing existing workspace: %s", workspace)
+            workspace_str = workspace.as_posix()
+            self._reuse_existing_workspace(workspace_str, repo_url, branch_name)
+            return workspace_str
+
+        # Remove existing workspace; if locked, fall back to a unique workspace path.
         if workspace.exists():
-            import shutil
-            import stat
-
             def _force_remove(func, path, _):
                 """Error handler that clears read-only flag, then retries."""
-                os.chmod(path, stat.S_IWRITE)
-                func(path)
+                try:
+                    os.chmod(path, stat.S_IWRITE)
+                    func(path)
+                except OSError:
+                    # Let outer handler decide fallback for locked files.
+                    raise
 
-            shutil.rmtree(workspace, onerror=_force_remove)
+            try:
+                shutil.rmtree(workspace, onerror=_force_remove)
+            except OSError as exc:
+                logger.warning(
+                    "Could not clean workspace '%s' (%s). Falling back to unique workspace.",
+                    workspace,
+                    exc,
+                )
+                workspace = self._build_unique_workspace(repo_name)
+
+        workspace_str = workspace.as_posix()
 
         Path(self.workspace_base).mkdir(parents=True, exist_ok=True)
 
@@ -105,6 +124,29 @@ class RepositoryAgent:
         self._run(["git", "config", "user.name", "AI Dev Agent"], cwd=workspace_str)
 
         return workspace_str
+
+    def _reuse_existing_workspace(
+        self, workspace: str, repo_url: str, branch_name: str
+    ) -> None:
+        """Prepare an existing cloned repository for a new run without creating a new folder."""
+        self._run(["git", "remote", "set-url", "origin", repo_url], cwd=workspace)
+        self._run(["git", "fetch", "origin"], cwd=workspace, check=False)
+        self._run(["git", "checkout", "-B", branch_name], cwd=workspace)
+        self._run(
+            ["git", "config", "user.email", "ai-agent@autonomous.dev"],
+            cwd=workspace,
+        )
+        self._run(["git", "config", "user.name", "AI Dev Agent"], cwd=workspace)
+
+    def _build_unique_workspace(self, repo_name: str) -> Path:
+        """Create a unique workspace path to avoid collisions with locked directories."""
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+        candidate = Path(self.workspace_base) / f"{repo_name}_{stamp}"
+        suffix = 1
+        while candidate.exists():
+            candidate = Path(self.workspace_base) / f"{repo_name}_{stamp}_{suffix}"
+            suffix += 1
+        return candidate
 
     async def analyze(self, workspace: str, story_data: dict) -> dict:
         """Perform deep analysis of the repository structure."""
@@ -144,8 +186,41 @@ class RepositoryAgent:
         analysis["detected_configs"] = self._detect_config_files(workspace)
         analysis["has_docker"] = os.path.exists(os.path.join(workspace, "Dockerfile"))
         analysis["has_ci"] = self._detect_ci(workspace)
+        analysis.update(self._repository_understanding(workspace))
 
         return analysis
+
+    def _repository_understanding(self, workspace: str) -> dict:
+        """Repository understanding output used by design/planning phases."""
+        ws = Path(workspace)
+
+        def relpaths(patterns: tuple[str, ...]) -> list[str]:
+            out: list[str] = []
+            for p in ws.rglob("*"):
+                if not p.is_file():
+                    continue
+                low = p.name.lower()
+                if any(tok in low for tok in patterns):
+                    out.append(str(p.relative_to(ws)).replace("\\", "/"))
+            return sorted(set(out))
+
+        entry_points = []
+        for name in ["app.py", "main.py", "server.py", "src/main.py", "src/index.js", "index.js"]:
+            p = ws / name
+            if p.exists():
+                entry_points.append(name)
+
+        return {
+            "models": relpaths(("model", "entity", "schema")),
+            "routes": relpaths(("route", "controller", "endpoint", "api")),
+            "services": relpaths(("service", "usecase")),
+            "repositories": relpaths(("repo", "repository")),
+            "tests": relpaths(("test", "spec", "conftest")),
+            "middleware": relpaths(("middleware", "interceptor", "guard")),
+            "database_layer": relpaths(("db", "database", "migration")),
+            "entry_points": sorted(set(entry_points)),
+            "folder_structure": self._get_tree(workspace, max_depth=3),
+        }
 
     def _static_analysis(self, workspace: str) -> dict:
         """Fallback: derive key repo facts without an LLM call."""

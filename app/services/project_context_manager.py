@@ -6,8 +6,8 @@ Stores and retrieves the active project state so the agent behaves like a real
 developer working on the SAME codebase across multiple prompts and Jira stories.
 
 State is persisted to:
-    workspace/agent/project_context.json   ← full context
-    workspace/agent/.active_project.txt    ← quick name lookup
+    workspace/.agent/project_context.json   ← full context
+    workspace/.agent/.active_project.txt    ← quick name lookup
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ from typing import Optional
 # Paths  (match your workspace/agent/ structure exactly)
 # ---------------------------------------------------------------------------
 
-WORKSPACE_AGENT_DIR = Path("workspace/agent")
+WORKSPACE_AGENT_DIR = Path("workspace/.agent")
 CONTEXT_FILE = WORKSPACE_AGENT_DIR / "project_context.json"
 ACTIVE_FILE = WORKSPACE_AGENT_DIR / ".active_project.txt"
 PROJECTS_DIR = WORKSPACE_AGENT_DIR / "projects"
@@ -46,6 +46,8 @@ class ProjectContext:
     database: str = ""
     auth_pattern: str = ""
     coding_style: str = ""
+    coding_conventions: str = ""
+    architecture: str = ""
     architecture_notes: str = ""
     package_manager: str = ""
     test_framework: str = ""
@@ -61,6 +63,7 @@ class ProjectContext:
     decisions: list = field(default_factory=list)  # ["Used JWT not sessions", ...]
     rejected_approaches: list = field(default_factory=list)
     story_history: list = field(default_factory=list)  # [{summary, timestamp}, ...]
+    project_history: list = field(default_factory=list)
     key_files: list = field(default_factory=list)  # important files discovered
 
     # Timestamps
@@ -183,10 +186,12 @@ class ProjectContextManager:
             return
         updatable = {
             "framework",
+            "architecture",
             "language",
             "database",
             "auth_pattern",
             "coding_style",
+            "coding_conventions",
             "architecture_notes",
             "package_manager",
             "test_framework",

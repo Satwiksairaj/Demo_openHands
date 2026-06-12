@@ -186,6 +186,62 @@ class TestCodeGenerationAgent:
         mock_gen.assert_called_once()
 
 
+class TestRepositoryAgent:
+    @pytest.mark.asyncio
+    async def test_clone_reuses_existing_workspace(self, tmp_path):
+        from agent.repo_agent import RepositoryAgent
+
+        config = {
+            "openai_api_key": "test-key",
+            "workspace_base": str(tmp_path),
+            "github": {"token": "", "repo_url": "", "owner": "", "repo": ""},
+        }
+        agent = RepositoryAgent(config)
+
+        existing = tmp_path / "repo"
+        (existing / ".git").mkdir(parents=True, exist_ok=True)
+
+        with patch.object(agent, "_reuse_existing_workspace") as mock_reuse:
+            workspace = await agent.clone_and_branch(
+                "https://github.com/test/repo.git", "feature/test"
+            )
+
+        assert workspace == existing.as_posix()
+        mock_reuse.assert_called_once_with(
+            existing.as_posix(),
+            "https://github.com/test/repo.git",
+            "feature/test",
+        )
+
+    @pytest.mark.asyncio
+    async def test_clone_uses_unique_workspace_when_cleanup_fails(self, tmp_path):
+        from agent.repo_agent import RepositoryAgent
+
+        config = {
+            "openai_api_key": "test-key",
+            "workspace_base": str(tmp_path),
+            "github": {"token": "", "repo_url": "", "owner": "", "repo": ""},
+        }
+        agent = RepositoryAgent(config)
+
+        existing = tmp_path / "repo"
+        existing.mkdir(parents=True, exist_ok=True)
+        (existing / "instance").mkdir(parents=True, exist_ok=True)
+        (existing / "instance" / "library.db").write_text("locked", encoding="utf-8")
+
+        with patch("agent.repo_agent.shutil.rmtree", side_effect=OSError("[WinError 32] locked")):
+            with patch.object(agent, "_run", return_value="") as mock_run:
+                workspace = await agent.clone_and_branch(
+                    "https://github.com/test/repo.git", "feature/test"
+                )
+
+        clone_cmd = mock_run.call_args_list[0].args[0]
+        assert clone_cmd[:2] == ["git", "clone"]
+        assert clone_cmd[-1] == workspace
+        assert workspace != existing.as_posix()
+        assert "repo_" in workspace
+
+
 # ─── Testing Agent Tests ──────────────────────────────────────────────────────
 
 
@@ -258,8 +314,7 @@ class TestOrchestrator:
         orchestrator.jira_agent.fetch_story = AsyncMock(return_value=SAMPLE_STORY)
         orchestrator.repo_agent.clone_and_branch = AsyncMock(return_value="/tmp/test")
         orchestrator.repo_agent.analyze = AsyncMock(return_value=SAMPLE_REPO_ANALYSIS)
-        # Orchestrator uses openhands.generate_implementation (not code_agent.generate) when use_openhands=True
-        orchestrator.openhands.generate_implementation = AsyncMock(
+        orchestrator.code_agent.generate = AsyncMock(
             return_value=["src/auth.js"]
         )
         orchestrator.openhands.teardown = AsyncMock()
@@ -308,7 +363,7 @@ class TestOrchestrator:
         orchestrator.jira_agent.fetch_story = AsyncMock(return_value=SAMPLE_STORY)
         orchestrator.repo_agent.clone_and_branch = AsyncMock(return_value="/tmp/test")
         orchestrator.repo_agent.analyze = AsyncMock(return_value=SAMPLE_REPO_ANALYSIS)
-        orchestrator.openhands.generate_implementation = AsyncMock(
+        orchestrator.code_agent.generate = AsyncMock(
             return_value=["src/auth.js"]
         )
         orchestrator.openhands.teardown = AsyncMock()
@@ -343,7 +398,7 @@ class TestOrchestrator:
         orchestrator.jira_agent.fetch_story = AsyncMock(return_value=SAMPLE_STORY)
         orchestrator.repo_agent.clone_and_branch = AsyncMock(return_value="/tmp/test")
         orchestrator.repo_agent.analyze = AsyncMock(return_value=SAMPLE_REPO_ANALYSIS)
-        orchestrator.openhands.generate_implementation = AsyncMock(
+        orchestrator.code_agent.generate = AsyncMock(
             return_value=["src/auth.js"]
         )
         orchestrator.openhands.teardown = AsyncMock()

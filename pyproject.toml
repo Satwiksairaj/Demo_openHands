@@ -44,11 +44,11 @@ agent = "cli.main:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["agent*", "cli*", "mcp*", "config*", "app*"]
+include = ["agent*", "cli*", "agent_mcp*", "local_mcp_server*", "config*", "app*"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-testpaths = ["tests"]
+testpaths = ["tests", "workspace/Demo_openHands/tests"]
 
 [tool.ruff]
 line-length = 100
@@ -64,3 +64,4 @@ exclude = [
 
 [tool.black]
 target-version = ["py312"]
+

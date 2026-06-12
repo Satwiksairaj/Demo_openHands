@@ -132,15 +132,21 @@ BANNER = """\
 +---------------------------------------------------------------+"""
 
 STEP_LABELS = {
-    "jira_fetch": "Step 1/9  Jira Story Fetch",
-    "repo_clone": "Step 2/9  Repository Clone",
-    "repo_analysis": "Step 3/9  Codebase Analysis",
-    "solution_design": "Step 4/9  Solution Architecture",
-    "code_generation": "Step 5/9  Code Generation",
-    "testing": "Step 6/9  Testing & Self-Healing",
-    "validation": "Step 7/9  Acceptance Validation",
-    "git_ops": "Step 8/9  Git Commit & Push",
-    "pr_creation": "Step 9/9  Pull Request Creation",
+    "jira_fetch": "Step 1/15  Jira Story Fetch",
+    "requirement_analysis": "Step 2/15  Requirement Analysis",
+    "project_context": "Step 3/15  Project Context Loading",
+    "repo_clone": "Step 4/15  Repository Clone",
+    "repo_understanding": "Step 5/15  Repository Understanding",
+    "solution_design": "Step 6/15  Solution Design",
+    "impact_analysis": "Step 7/15  Impact Analysis",
+    "implementation_plan": "Step 8/15  Implementation Planning",
+    "code_generation": "Step 9/15  Code Generation",
+    "static_validation": "Step 10/15  Static Validation",
+    "testing": "Step 11/15  Testing",
+    "healing": "Step 12/15  Autonomous Healing",
+    "acceptance_validation": "Step 13/15  Acceptance Validation",
+    "review": "Step 14/15  Code Review",
+    "git_ops": "Step 15/15  Git Commit & Push",
     "complete": "DONE",
     "failed": "FAILED",
 }
@@ -273,7 +279,7 @@ def run(ctx, story, prompt, dry_run, output):
     async def _run():
         from agent.orchestrator import OrchestratorAgent
 
-        orch = OrchestratorAgent(config, use_openhands=True)
+        orch = OrchestratorAgent(config, strict_mode=True)
 
         with Progress(
             SpinnerColumn(),

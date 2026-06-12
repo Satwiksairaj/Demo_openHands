@@ -30,6 +30,8 @@ class ImpactReport:
     create: list[str] = field(default_factory=list)
     skip: list[str] = field(default_factory=list)
     reasoning: dict[str, str] = field(default_factory=dict)
+    files_to_avoid: list[str] = field(default_factory=list)
+    affected_tests: list[str] = field(default_factory=list)
 
     def summary(self) -> str:
         lines = []
@@ -307,7 +309,24 @@ class ImpactAnalyzer:
         report.modify = sorted(to_modify)
         report.create = self._suggest_new(prompt, to_modify)
         report.skip = sorted(set(self._files) - to_modify)
+        report.files_to_avoid = report.skip
+        report.affected_tests = [f for f in report.modify if "test" in f.lower()]
         return report
+
+    def analyze_structured(
+        self,
+        prompt: str,
+        rag_results: Optional[list[dict]] = None,
+    ) -> dict:
+        """Return orchestrator-friendly structured impact output."""
+        report = self.analyze(prompt=prompt, rag_results=rag_results)
+        return {
+            "files_to_modify": report.modify,
+            "files_to_create": report.create,
+            "files_to_avoid": report.files_to_avoid,
+            "affected_tests": report.affected_tests,
+            "reasoning": report.reasoning,
+        }
 
     def _suggest_new(self, prompt: str, existing: set[str]) -> list[str]:
         low = prompt.lower()
